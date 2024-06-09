@@ -6,6 +6,9 @@ import logging
 import json
 import config
 import os
+import usbio
+
+useGPIO = False
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +38,8 @@ class Output(object):
         self.load_libs()
 
     def load_libs(self):
+        if not useGPIO:
+            return
         try:
             import RPi.GPIO as GPIO
             GPIO.setmode(GPIO.BCM)
@@ -48,12 +53,18 @@ class Output(object):
             self.active = False
 
     def heat(self,sleepfor):
-        self.GPIO.output(config.gpio_heat, self.GPIO.HIGH)
+        if not useGPIO:
+            usbio.heat()
+        else:
+            self.GPIO.output(config.gpio_heat, self.GPIO.HIGH)
         time.sleep(sleepfor)
 
     def cool(self,sleepfor):
         '''no active cooling, so sleep'''
-        self.GPIO.output(config.gpio_heat, self.GPIO.LOW)
+        if not useGPIO:
+            usbio.cool()
+        else:
+            self.GPIO.output(config.gpio_heat, self.GPIO.LOW)
         time.sleep(sleepfor)
 
 # FIX - Board class needs to be completely removed

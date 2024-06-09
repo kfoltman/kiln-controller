@@ -1,6 +1,14 @@
 #!/usr/bin/python
-import RPi.GPIO as GPIO
+
 import math
+import os
+import usbio
+
+if usbio.useGPIO:
+    import RPi.GPIO as GPIO
+    def_board = GPIO.BCM
+else:
+    def_board = None
 
 class MAX31855(object):
     '''Python driver for [MAX38155 Cold-Junction Compensated Thermocouple-to-Digital Converter](http://www.maximintegrated.com/datasheet/index.mvp/id/7273)
@@ -9,7 +17,7 @@ class MAX31855(object):
      - A [Raspberry Pi](http://www.raspberrypi.org/)
 
     '''
-    def __init__(self, cs_pin, clock_pin, data_pin, units = "c", board = GPIO.BCM):
+    def __init__(self, cs_pin, clock_pin, data_pin, units = "c", board = def_board):
         '''Initialize Soft (Bitbang) SPI bus
 
         Parameters:
@@ -27,15 +35,17 @@ class MAX31855(object):
         self.data = None
         self.board = board
         self.noConnection = self.shortToGround = self.shortToVCC = self.unknownError = False
+        if usbio.useGPIO:
+            # Initialize needed GPIO
+            GPIO.setmode(self.board)
+            GPIO.setup(self.cs_pin, GPIO.OUT)
+            GPIO.setup(self.clock_pin, GPIO.OUT)
+            GPIO.setup(self.data_pin, GPIO.IN)
 
-        # Initialize needed GPIO
-        GPIO.setmode(self.board)
-        GPIO.setup(self.cs_pin, GPIO.OUT)
-        GPIO.setup(self.clock_pin, GPIO.OUT)
-        GPIO.setup(self.data_pin, GPIO.IN)
-
-        # Pull chip select high to make chip inactive
-        GPIO.output(self.cs_pin, GPIO.HIGH)
+            # Pull chip select high to make chip inactive
+            GPIO.output(self.cs_pin, GPIO.HIGH)
+        else:
+            usbio.init()
 
     def get(self):
         '''Reads SPI bus and returns current value of thermocouple.'''
@@ -50,6 +60,9 @@ class MAX31855(object):
         return getattr(self, "to_" + self.units)(self.data_to_rj_temperature())
 
     def read(self):
+        if not usbio.useGPIO:
+            self.data = usbio.measure()
+            return
         '''Reads 32 bits of the SPI bus & stores as an integer in self.data.'''
         bytesin = 0
         # Select the chip
@@ -128,6 +141,9 @@ class MAX31855(object):
 
     def cleanup(self):
         '''Selective GPIO cleanup'''
+        if not usbio.useGPIO:
+            usbio.cleanup()
+            return
         GPIO.setup(self.cs_pin, GPIO.IN)
         GPIO.setup(self.clock_pin, GPIO.IN)
 
